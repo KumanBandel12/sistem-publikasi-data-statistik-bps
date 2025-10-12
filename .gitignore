@@ -1,0 +1,43 @@
+# Compiled class files
+*.class
+target/
+*.jar
+*.war
+*.ear
+
+# Log files
+*.log
+logs/
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Uploaded files (PENTING!)
+uploads/
+
+# Application properties with sensitive data
+# Uncomment jika ada data sensitif
+# src/main/resources/application.properties
+
+# Environment variables
+.env
+
+# Database
+*.db
+*.sqlite
