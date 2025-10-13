@@ -28,16 +28,18 @@ mvnw.cmd
 .DS_Store
 Thumbs.db
 
-# Uploaded files (PENTING!)
+# Uploaded files
 uploads/
-
-# Application properties with sensitive data
-# Uncomment jika ada data sensitif
-# src/main/resources/application.properties
 
 # Environment variables
 .env
 
-# Database
+# Database files
 *.db
 *.sqlite
+*.sql.gz
+*.sql.zip
+
+# MySQL specific
+*.sql
+database-backup/
