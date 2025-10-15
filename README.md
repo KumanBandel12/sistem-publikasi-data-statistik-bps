@@ -53,6 +53,54 @@ Sistem ini memungkinkan admin BPS untuk mengunggah, mengelola, dan mendistribusi
 
 ---
 
+## 🔧 Architecture
+
+### Web Service Type: REST API
+
+Sistem ini dibangun menggunakan arsitektur **REST (Representational State Transfer)**, yang merupakan style arsitektur web service yang paling populer saat ini.
+
+#### REST Principles
+
+**1. Client-Server Architecture**
+- Server menangani business logic, database, dan file storage
+- Client menangani user interface
+- Komunikasi via HTTP request/response
+
+**2. Stateless**
+- Setiap request berisi semua informasi yang dibutuhkan
+- Server tidak menyimpan session atau state client
+- Authentication menggunakan JWT token
+
+**3. Resource-Based URLs**
+- `/api/users` - Resource: Users
+- `/api/categories` - Resource: Categories
+- `/api/publications` - Resource: Publications
+- `/api/profile` - Resource: User Profile
+
+**4. HTTP Methods untuk CRUD**
+
+| Operation | HTTP Method | Endpoint | Deskripsi |
+|-----------|-------------|----------|-----------|
+| Create | POST | `/api/publications` | Upload publikasi baru |
+| Read | GET | `/api/publications` | Get list publikasi |
+| Read | GET | `/api/publications/{id}` | Get publikasi by ID |
+| Update | PUT | `/api/publications/{id}` | Update publikasi |
+| Delete | DELETE | `/api/publications/{id}` | Delete publikasi |
+
+**5. HTTP Status Codes**
+
+| Status | Meaning | Usage |
+|--------|---------|-------|
+| 200 | OK | GET, PUT, DELETE success |
+| 201 | Created | POST success |
+| 400 | Bad Request | Validation error |
+| 401 | Unauthorized | No/invalid token |
+| 403 | Forbidden | No permission |
+| 404 | Not Found | Resource not found |
+| 500 | Server Error | Server error |
+
+---
+
 ## 📂 Struktur Project
 
 ```
