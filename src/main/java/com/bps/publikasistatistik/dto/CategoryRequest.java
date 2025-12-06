@@ -16,4 +16,10 @@ public class CategoryRequest {
     private String name;
 
     private String description;
+
+    // ID parent category (null jika root category)
+    private Long parentId;
+
+    // Urutan tampilan (default 0)
+    private Integer displayOrder = 0;
 }

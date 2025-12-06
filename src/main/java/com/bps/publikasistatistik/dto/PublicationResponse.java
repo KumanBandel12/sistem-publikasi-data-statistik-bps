@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -14,6 +15,14 @@ public class PublicationResponse {
     private Long id;
     private String title;
     private String description;
+    private String catalogNumber;
+    private String publicationNumber;
+    private String issnIsbn;
+    private String releaseFrequency;
+    private LocalDate releaseDate;
+    private String language;
+    private String coverImage;
+    private String coverUrl;
     private String fileName;
     private String fileUrl;
     private Long fileSize;
@@ -32,6 +41,14 @@ public class PublicationResponse {
         this.id = publication.getId();
         this.title = publication.getTitle();
         this.description = publication.getDescription();
+        this.catalogNumber = publication.getCatalogNumber();
+        this.publicationNumber = publication.getPublicationNumber();
+        this.issnIsbn = publication.getIssnIsbn();
+        this.releaseFrequency = publication.getReleaseFrequency();
+        this.releaseDate = publication.getReleaseDate();
+        this.language = publication.getLanguage();
+        this.coverImage = publication.getCoverImage();
+        this.coverUrl = publication.getCoverImage() != null ? "/api/publications/" + publication.getId() + "/cover" : null;
         this.fileName = publication.getFileName();
         this.fileUrl = "/api/publications/" + publication.getId() + "/download";
         this.fileSize = publication.getFileSize();

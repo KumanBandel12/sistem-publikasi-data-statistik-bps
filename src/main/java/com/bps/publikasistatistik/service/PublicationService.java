@@ -16,6 +16,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.PageRequest;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -31,6 +32,7 @@ public class PublicationService {
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final NotificationService notificationService;
 
     public List<PublicationResponse> getAllPublications() {
         return publicationRepository.findAll().stream()
@@ -38,12 +40,56 @@ public class PublicationService {
                 .collect(Collectors.toList());
     }
 
-    public List<PublicationResponse> searchPublications(String keyword) {
-        if (keyword == null || keyword.trim().isEmpty()) {
-            return getAllPublications();
+    public List<PublicationResponse> searchPublications(String keyword, Long categoryId, Integer year, String sort) {
+        List<Publication> publications;
+
+        // Build query based on filters
+        if (keyword != null && !keyword.trim().isEmpty() && categoryId != null && year != null) {
+            // Search + Category + Year
+            publications = publicationRepository.searchByKeyword(keyword).stream()
+                    .filter(p -> p.getCategory().getId().equals(categoryId) && p.getYear().equals(year))
+                    .collect(Collectors.toList());
+        } else if (keyword != null && !keyword.trim().isEmpty() && categoryId != null) {
+            // Search + Category
+            publications = publicationRepository.searchByKeyword(keyword).stream()
+                    .filter(p -> p.getCategory().getId().equals(categoryId))
+                    .collect(Collectors.toList());
+        } else if (keyword != null && !keyword.trim().isEmpty() && year != null) {
+            // Search + Year
+            publications = publicationRepository.searchByKeyword(keyword).stream()
+                    .filter(p -> p.getYear().equals(year))
+                    .collect(Collectors.toList());
+        } else if (categoryId != null && year != null) {
+            // Category + Year
+            publications = publicationRepository.findByCategoryIdAndYear(categoryId, year);
+        } else if (keyword != null && !keyword.trim().isEmpty()) {
+            // Search only
+            publications = publicationRepository.searchByKeyword(keyword);
+        } else if (categoryId != null) {
+            // Category only
+            publications = publicationRepository.findByCategoryId(categoryId);
+        } else if (year != null) {
+            // Year only
+            publications = publicationRepository.findByYear(year);
+        } else {
+            // No filter
+            publications = publicationRepository.findAll();
         }
 
-        return publicationRepository.searchByKeyword(keyword).stream()
+        // Apply sorting
+        if (sort != null && !sort.trim().isEmpty()) {
+            if (sort.equalsIgnoreCase("latest")) {
+                publications = publications.stream()
+                        .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
+                        .collect(Collectors.toList());
+            } else if (sort.equalsIgnoreCase("oldest")) {
+                publications = publications.stream()
+                        .sorted((p1, p2) -> p1.getCreatedAt().compareTo(p2.getCreatedAt()))
+                        .collect(Collectors.toList());
+            }
+        }
+
+        return publications.stream()
                 .map(PublicationResponse::new)
                 .collect(Collectors.toList());
     }
@@ -100,10 +146,21 @@ public class PublicationService {
             throw new RuntimeException("File is required");
         }
 
-        // Validate file type (PDF, Excel)
+        // Validate file type (PDF only)
         String contentType = file.getContentType();
         if (!isValidFileType(contentType)) {
-            throw new RuntimeException("Invalid file type. Only PDF and Excel files are allowed");
+            throw new RuntimeException("Invalid file type. Only PDF files are allowed");
+        }
+
+        // Validate release date year matches year field
+        if (request.getReleaseDate() != null && request.getYear() != null) {
+            int releaseDateYear = request.getReleaseDate().getYear();
+            if (releaseDateYear != request.getYear()) {
+                throw new RuntimeException(
+                    String.format("Release date year (%d) must match the year field (%d)", 
+                        releaseDateYear, request.getYear())
+                );
+            }
         }
 
         // Get category
@@ -116,13 +173,29 @@ public class PublicationService {
 
         // Store file
         String fileName = fileStorageService.storeFile(file);
+        Path filePath = fileStorageService.loadFile(fileName);
+
+        // Generate cover image from PDF
+        String coverFileName = null;
+        try {
+            coverFileName = fileStorageService.generateCoverFromPDF(filePath);
+        } catch (Exception e) {
+            log.error("Failed to generate cover, continuing without cover: {}", e.getMessage());
+        }
 
         // Create publication
         Publication publication = new Publication();
         publication.setTitle(request.getTitle());
         publication.setDescription(request.getDescription());
+        publication.setCatalogNumber(request.getCatalogNumber());
+        publication.setPublicationNumber(request.getPublicationNumber());
+        publication.setIssnIsbn(request.getIssnIsbn());
+        publication.setReleaseFrequency(request.getReleaseFrequency());
+        publication.setReleaseDate(request.getReleaseDate());
+        publication.setLanguage(request.getLanguage());
+        publication.setCoverImage(coverFileName);
         publication.setFileName(fileName);
-        publication.setFilePath(fileStorageService.loadFile(fileName).toString());
+        publication.setFilePath(filePath.toString());
         publication.setFileSize(file.getSize());
         publication.setYear(request.getYear());
         publication.setAuthor(request.getAuthor());
@@ -133,6 +206,9 @@ public class PublicationService {
 
         Publication savedPublication = publicationRepository.save(publication);
         log.info("Publication uploaded: {} by {}", savedPublication.getTitle(), user.getEmail());
+        
+        // Notify all users about new publication
+        notificationService.notifyAllUsersNewPublication(savedPublication);
 
         return new PublicationResponse(savedPublication);
     }
@@ -149,6 +225,17 @@ public class PublicationService {
             throw new RuntimeException("You don't have permission to update this publication");
         }
 
+        // Validate release date year matches year field
+        if (request.getReleaseDate() != null && request.getYear() != null) {
+            int releaseDateYear = request.getReleaseDate().getYear();
+            if (releaseDateYear != request.getYear()) {
+                throw new RuntimeException(
+                    String.format("Release date year (%d) must match the year field (%d)", 
+                        releaseDateYear, request.getYear())
+                );
+            }
+        }
+
         // Get category
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
@@ -156,6 +243,12 @@ public class PublicationService {
         // Update publication
         publication.setTitle(request.getTitle());
         publication.setDescription(request.getDescription());
+        publication.setCatalogNumber(request.getCatalogNumber());
+        publication.setPublicationNumber(request.getPublicationNumber());
+        publication.setIssnIsbn(request.getIssnIsbn());
+        publication.setReleaseFrequency(request.getReleaseFrequency());
+        publication.setReleaseDate(request.getReleaseDate());
+        publication.setLanguage(request.getLanguage());
         publication.setYear(request.getYear());
         publication.setAuthor(request.getAuthor());
         publication.setCategory(category);
@@ -181,6 +274,11 @@ public class PublicationService {
         // Delete file
         fileStorageService.deleteFile(publication.getFileName());
 
+        // Delete cover image if exists
+        if (publication.getCoverImage() != null) {
+            fileStorageService.deleteCoverImage(publication.getCoverImage());
+        }
+
         // Delete publication
         publicationRepository.delete(publication);
         log.info("Publication deleted: {}", publication.getTitle());
@@ -192,8 +290,19 @@ public class PublicationService {
                 .orElseThrow(() -> new RuntimeException("Publication not found with id: " + id));
 
         // Increment downloads
-        publication.setDownloads(publication.getDownloads() + 1);
+        int previousDownloads = publication.getDownloads();
+        publication.setDownloads(previousDownloads + 1);
         publicationRepository.save(publication);
+        
+        // Check milestone and notify admins (100, 500, 1000)
+        int newDownloads = publication.getDownloads();
+        if ((previousDownloads < 100 && newDownloads >= 100) ||
+            (previousDownloads < 500 && newDownloads >= 500) ||
+            (previousDownloads < 1000 && newDownloads >= 1000)) {
+            // Determine which milestone was reached
+            int milestone = newDownloads >= 1000 ? 1000 : (newDownloads >= 500 ? 500 : 100);
+            notificationService.notifyAdminsMilestone(publication, milestone);
+        }
 
         // Load file as Resource
         Path filePath = fileStorageService.loadFile(publication.getFileName());
@@ -206,11 +315,34 @@ public class PublicationService {
         }
     }
 
+    public Resource getCoverImage(Long id) throws IOException {
+        Publication publication = publicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Publication not found with id: " + id));
+
+        if (publication.getCoverImage() == null) {
+            throw new RuntimeException("Cover image not found for this publication");
+        }
+
+        // Load cover image as Resource
+        Path coverPath = fileStorageService.loadCoverImage(publication.getCoverImage());
+        Resource resource = new UrlResource(coverPath.toUri());
+
+        if (resource.exists() && resource.isReadable()) {
+            return resource;
+        } else {
+            throw new RuntimeException("Cover image file not found: " + publication.getCoverImage());
+        }
+    }
+
     private boolean isValidFileType(String contentType) {
-        return contentType != null && (
-                contentType.equals("application/pdf") ||
-                        contentType.equals("application/vnd.ms-excel") ||
-                        contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        );
+        return contentType != null && contentType.equals("application/pdf");
+    }
+
+    public List<String> getSearchSuggestions(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return List.of();
+        }
+        // Ambil maksimal 10 saran judul
+        return publicationRepository.findTitleSuggestions(keyword.trim(), PageRequest.of(0, 10));
     }
 }

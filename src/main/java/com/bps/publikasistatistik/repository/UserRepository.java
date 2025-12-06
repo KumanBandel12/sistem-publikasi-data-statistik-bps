@@ -20,4 +20,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Check if username exists (untuk validasi registrasi)
     Boolean existsByUsername(String username);
+    
+    // Find users by role (for notification targeting)
+    java.util.List<User> findByRole(User.Role role);
 }

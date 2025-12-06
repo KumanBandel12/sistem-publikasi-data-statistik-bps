@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -32,6 +33,27 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role = Role.USER;
+
+    @Column(name = "full_name")
+    private String fullName;
+
+    @Column(length = 20)
+    private String gender; // "Laki-laki" atau "Perempuan"
+
+    @Column(name = "place_of_birth")
+    private String placeOfBirth;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
+    @Column(columnDefinition = "TEXT")
+    private String address;
+
+    @Column(name = "profile_picture")
+    private String profilePicture;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

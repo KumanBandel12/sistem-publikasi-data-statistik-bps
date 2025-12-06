@@ -27,6 +27,23 @@ public class Category {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    // Parent Category untuk hierarki (null jika root category)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Category parentCategory;
+
+    // Sub-categories
+    @OneToMany(mappedBy = "parentCategory", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Category> subCategories = new ArrayList<>();
+
+    // Level hierarki: 0 = root, 1 = sub-kategori (max 2 level)
+    @Column(nullable = false)
+    private Integer level = 0;
+
+    // Urutan tampilan
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -1,6 +1,7 @@
 package com.bps.publikasistatistik.repository;
 
 import com.bps.publikasistatistik.entity.Publication;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -43,4 +44,9 @@ public interface PublicationRepository extends JpaRepository<Publication, Long> 
 
     // Count publications by category
     Long countByCategoryId(Long categoryId);
+
+    @Query("SELECT DISTINCT p.title FROM Publication p " +
+           "WHERE LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "ORDER BY p.title ASC")
+    List<String> findTitleSuggestions(@Param("keyword") String keyword, Pageable pageable);
 }

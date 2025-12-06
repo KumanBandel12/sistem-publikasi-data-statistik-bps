@@ -1,6 +1,7 @@
 package com.bps.publikasistatistik.service;
 
 import com.bps.publikasistatistik.dto.AuthResponse;
+import com.bps.publikasistatistik.dto.ForgotPasswordRequest;
 import com.bps.publikasistatistik.dto.LoginRequest;
 import com.bps.publikasistatistik.dto.RegisterRequest;
 import com.bps.publikasistatistik.dto.UserResponse;
@@ -27,6 +28,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
+    private final NotificationService notificationService;
 
     @Transactional
     public UserResponse register(RegisterRequest request) {
@@ -49,6 +51,9 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
         log.info("New user registered: {}", savedUser.getEmail());
+        
+        // Notify all admins about new user registration
+        notificationService.notifyAdminsNewUser(savedUser);
 
         return new UserResponse(savedUser);
     }
@@ -75,5 +80,43 @@ public class AuthService {
         log.info("User logged in: {}", user.getEmail());
 
         return new AuthResponse(jwt, new UserResponse(user));
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        // Validate password confirmation
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("Password and confirmation password do not match");
+        }
+
+        // Find user by email
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + request.getEmail()));
+
+        // Validate security questions
+        // Check if user has completed profile (dateOfBirth and placeOfBirth must be filled)
+        if (user.getDateOfBirth() == null || user.getPlaceOfBirth() == null || 
+            user.getPlaceOfBirth().trim().isEmpty()) {
+            throw new RuntimeException("Profile data incomplete. Please contact admin to reset password.");
+        }
+
+        // Validate date of birth
+        if (!user.getDateOfBirth().equals(request.getDateOfBirth())) {
+            throw new RuntimeException("Date of birth is incorrect");
+        }
+
+        // Validate place of birth (case-insensitive, trim whitespace)
+        if (!user.getPlaceOfBirth().trim().equalsIgnoreCase(request.getPlaceOfBirth().trim())) {
+            throw new RuntimeException("Place of birth is incorrect");
+        }
+
+        // All validations passed - update password
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        log.info("Password reset successfully for user: {}", user.getEmail());
+
+        // Send security alert notification
+        notificationService.notifyPasswordChanged(user);
     }
 }

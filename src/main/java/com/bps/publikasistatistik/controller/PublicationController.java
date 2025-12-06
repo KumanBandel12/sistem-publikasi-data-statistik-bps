@@ -5,6 +5,7 @@ import com.bps.publikasistatistik.dto.PublicationRequest;
 import com.bps.publikasistatistik.dto.PublicationResponse;
 import com.bps.publikasistatistik.security.CustomUserDetails;
 import com.bps.publikasistatistik.service.PublicationService;
+import com.bps.publikasistatistik.service.SearchHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,28 +35,23 @@ import java.util.List;
 public class PublicationController {
 
     private final PublicationService publicationService;
+    private final SearchHistoryService searchHistoryService;
 
     @GetMapping
     @Operation(summary = "Get all publications", description = "Get list of all publications or search by keyword")
     public ResponseEntity<ApiResponse<List<PublicationResponse>>> getAllPublications(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Integer year) {
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String sort,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
         try {
-            List<PublicationResponse> publications;
-
-            if (categoryId != null && year != null) {
-                publications = publicationService.getPublicationsByCategoryAndYear(categoryId, year);
-            } else if (categoryId != null) {
-                publications = publicationService.getPublicationsByCategory(categoryId);
-            } else if (year != null) {
-                publications = publicationService.getPublicationsByYear(year);
-            } else if (search != null) {
-                publications = publicationService.searchPublications(search);
-            } else {
-                publications = publicationService.getAllPublications();
+            // Save search keyword to history if search parameter is provided
+            if (search != null && !search.trim().isEmpty()) {
+                searchHistoryService.saveSearchKeyword(userDetails, search.trim());
             }
-
+            
+            List<PublicationResponse> publications = publicationService.searchPublications(search, categoryId, year, sort);
             return ResponseEntity.ok(new ApiResponse<>(true, "Publications retrieved successfully", publications));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
@@ -117,7 +113,8 @@ public class PublicationController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update publication", description = "Update publication metadata (Admin or Owner only)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update publication", description = "Update publication metadata (Admin only)")
     public ResponseEntity<ApiResponse<PublicationResponse>> updatePublication(
             @PathVariable Long id,
             @Valid @RequestBody PublicationRequest request,
@@ -132,7 +129,8 @@ public class PublicationController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete publication", description = "Delete publication and its file (Admin or Owner only)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete publication", description = "Delete publication and its file (Admin only)")
     public ResponseEntity<ApiResponse<Void>> deletePublication(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -167,6 +165,35 @@ public class PublicationController {
                     .body(resource);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{id}/cover")
+    @Operation(summary = "Get publication cover image", description = "Get cover image of publication")
+    public ResponseEntity<Resource> getCoverImage(@PathVariable Long id) {
+        try {
+            Resource resource = publicationService.getCoverImage(id);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.IMAGE_JPEG)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=\"" + resource.getFilename() + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/suggestions")
+    @Operation(summary = "Get search suggestions", description = "Get list of publication titles for autocomplete")
+    public ResponseEntity<ApiResponse<List<String>>> getSuggestions(
+            @RequestParam String keyword) {
+        try {
+            List<String> suggestions = publicationService.getSearchSuggestions(keyword);
+            return ResponseEntity.ok(new ApiResponse<>(true, "Suggestions retrieved", suggestions));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, e.getMessage(), null));
         }
     }
 }

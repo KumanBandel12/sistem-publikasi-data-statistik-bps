@@ -2,6 +2,7 @@ package com.bps.publikasistatistik.controller;
 
 import com.bps.publikasistatistik.dto.ApiResponse;
 import com.bps.publikasistatistik.dto.AuthResponse;
+import com.bps.publikasistatistik.dto.ForgotPasswordRequest;
 import com.bps.publikasistatistik.dto.LoginRequest;
 import com.bps.publikasistatistik.dto.RegisterRequest;
 import com.bps.publikasistatistik.dto.UserResponse;
@@ -44,6 +45,18 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new ApiResponse<>(false, "Invalid email or password", null));
+        }
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password", description = "Reset password using security questions (email + date of birth + place of birth)")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        try {
+            authService.forgotPassword(request);
+            return ResponseEntity.ok(new ApiResponse<>(true, "Password reset successfully. You can now login with your new password."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, e.getMessage()));
         }
     }
 }

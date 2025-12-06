@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,6 +26,27 @@ public class Publication {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "catalog_number", length = 50)
+    private String catalogNumber;
+
+    @Column(name = "publication_number", length = 50)
+    private String publicationNumber;
+
+    @Column(name = "issn_isbn", length = 50)
+    private String issnIsbn;
+
+    @Column(name = "release_frequency", length = 50)
+    private String releaseFrequency; // Contoh: "Tahunan", "Bulanan"
+
+    @Column(name = "release_date")
+    private LocalDate releaseDate; // Tanggal rilis lengkap
+
+    @Column(length = 50)
+    private String language; // Contoh: "Indonesia", "Inggris"
+
+    @Column(name = "cover_image")
+    private String coverImage; // Nama file cover
 
     @Column(name = "file_name", nullable = false)
     private String fileName;

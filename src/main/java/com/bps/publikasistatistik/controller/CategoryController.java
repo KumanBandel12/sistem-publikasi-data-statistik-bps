@@ -36,6 +36,30 @@ public class CategoryController {
                     .body(new ApiResponse<>(false, e.getMessage(), null));
         }
     }
+    
+    @GetMapping("/tree")
+    @Operation(summary = "Get category tree", description = "Get all categories in hierarchical tree structure with sub-categories")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getCategoryTree() {
+        try {
+            List<CategoryResponse> categoryTree = categoryService.getCategoryTree();
+            return ResponseEntity.ok(new ApiResponse<>(true, "Category tree retrieved successfully", categoryTree));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+    
+    @GetMapping("/{id}/subcategories")
+    @Operation(summary = "Get sub-categories", description = "Get all sub-categories of a parent category")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getSubCategories(@PathVariable Long id) {
+        try {
+            List<CategoryResponse> subCategories = categoryService.getSubCategories(id);
+            return ResponseEntity.ok(new ApiResponse<>(true, "Sub-categories retrieved successfully", subCategories));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get category by ID", description = "Get category details by ID")
