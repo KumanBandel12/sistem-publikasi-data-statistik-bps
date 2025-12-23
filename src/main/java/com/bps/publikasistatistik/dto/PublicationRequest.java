@@ -45,4 +45,6 @@ public class PublicationRequest {
 
     @Size(max = 50, message = "Language must not exceed 50 characters")
     private String language;
+
+    private Boolean isFlagship = false;
 }

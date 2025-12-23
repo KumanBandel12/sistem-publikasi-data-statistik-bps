@@ -79,6 +79,9 @@ public class Publication {
     @JoinColumn(name = "uploaded_by", nullable = false)
     private User uploadedBy;
 
+    @Column(name = "is_flagship", nullable = false)
+    private Boolean isFlagship = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

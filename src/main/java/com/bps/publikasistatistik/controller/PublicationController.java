@@ -37,6 +37,18 @@ public class PublicationController {
     private final PublicationService publicationService;
     private final SearchHistoryService searchHistoryService;
 
+    @GetMapping("/home/carousel")
+    @Operation(summary = "Get featured publications", description = "Get top 9 featured publications for carousel")
+    public ResponseEntity<ApiResponse<List<PublicationResponse>>> getFeaturedPublications() {
+        try {
+            List<PublicationResponse> publications = publicationService.getFeaturedPublications();
+            return ResponseEntity.ok(new ApiResponse<>(true, "Featured publications retrieved", publications));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
     @GetMapping
     @Operation(summary = "Get all publications", description = "Get list of all publications or search by keyword")
     public ResponseEntity<ApiResponse<List<PublicationResponse>>> getAllPublications(

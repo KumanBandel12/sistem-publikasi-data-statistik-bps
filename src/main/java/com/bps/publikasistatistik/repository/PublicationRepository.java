@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -49,4 +50,11 @@ public interface PublicationRepository extends JpaRepository<Publication, Long> 
            "WHERE LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
            "ORDER BY p.title ASC")
     List<String> findTitleSuggestions(@Param("keyword") String keyword, Pageable pageable);
+
+    // --- QUERY UNTUK SLIDE 1 (Unggulan) ---
+    // Ambil yang ditandai flagship, urutkan dari yang terbaru ditandai/diupdate
+    List<Publication> findByIsFlagshipTrueOrderByUpdatedAtDesc();
+
+    // Hitung jumlah flagship aktif
+    long countByIsFlagshipTrue();
 }

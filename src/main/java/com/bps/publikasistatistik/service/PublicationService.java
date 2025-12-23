@@ -135,6 +135,21 @@ public class PublicationService {
         return new PublicationResponse(publication);
     }
 
+    public List<PublicationResponse> getFeaturedPublications() {
+        // Ambil data flagship
+        List<Publication> flagships = publicationRepository.findByIsFlagshipTrueOrderByUpdatedAtDesc();
+
+        // Limit max 9
+        if (flagships.size() > 9) {
+            flagships = flagships.subList(0, 9);
+        }
+
+        // Kembalikan sebagai List
+        return flagships.stream()
+                .map(PublicationResponse::new)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public PublicationResponse uploadPublication(
             PublicationRequest request,
@@ -183,6 +198,16 @@ public class PublicationService {
             log.error("Failed to generate cover, continuing without cover: {}", e.getMessage());
         }
 
+        // VALIDASI ATURAN KERAS: Maksimal 9 Unggulan
+        if (Boolean.TRUE.equals(request.getIsFlagship())) {
+            long currentFlagshipCount = publicationRepository.countByIsFlagshipTrue();
+            if (currentFlagshipCount >= 9) {
+                throw new RuntimeException("Maksimal 9 Publikasi Unggulan aktif. Mohon uncheck salah satu publikasi " +
+                        "lama terlebih dahulu.");
+            }
+        }
+
+
         // Create publication
         Publication publication = new Publication();
         publication.setTitle(request.getTitle());
@@ -203,6 +228,7 @@ public class PublicationService {
         publication.setUploadedBy(user);
         publication.setViews(0);
         publication.setDownloads(0);
+        publication.setIsFlagship(request.getIsFlagship() != null ? request.getIsFlagship() : false);
 
         Publication savedPublication = publicationRepository.save(publication);
         log.info("Publication uploaded: {} by {}", savedPublication.getTitle(), user.getEmail());
@@ -236,6 +262,15 @@ public class PublicationService {
             }
         }
 
+        // VALIDASI SAAT UPDATE (Cek Flagship)
+        if (Boolean.TRUE.equals(request.getIsFlagship()) && !Boolean.TRUE.equals(publication.getIsFlagship())) {
+            // Jika dulunya FALSE sekarang mau jadi TRUE, cek kuota
+            long currentFlagshipCount = publicationRepository.countByIsFlagshipTrue();
+            if (currentFlagshipCount >= 9) {
+                throw new RuntimeException("Kuota Publikasi Unggulan penuh (Max 9).");
+            }
+        }
+
         // Get category
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
@@ -252,6 +287,7 @@ public class PublicationService {
         publication.setYear(request.getYear());
         publication.setAuthor(request.getAuthor());
         publication.setCategory(category);
+        publication.setIsFlagship(request.getIsFlagship() != null ? request.getIsFlagship() : publication.getIsFlagship());
 
         Publication updatedPublication = publicationRepository.save(publication);
         log.info("Publication updated: {}", updatedPublication.getTitle());
