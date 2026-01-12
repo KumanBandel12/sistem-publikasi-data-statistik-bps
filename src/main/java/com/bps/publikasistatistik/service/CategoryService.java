@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,7 +25,22 @@ public class CategoryService {
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findAll().stream()
                 .map(category -> {
-                    Long count = publicationRepository.countByCategoryId(category.getId());
+                    Long count;
+                    if (category.getLevel() == 0) {
+                        // For parent category, count publications from itself AND all sub-categories
+                        List<Long> categoryIds = new ArrayList<>();
+                        categoryIds.add(category.getId());
+
+                        List<Category> subCategories = categoryRepository.findByParentCategoryId(category.getId());
+                        for (Category sub : subCategories) {
+                            categoryIds.add(sub.getId());
+                        }
+
+                        count = publicationRepository.countByCategoryIdIn(categoryIds);
+                    } else {
+                        // For sub-category, count only its own publications
+                        count = publicationRepository.countByCategoryId(category.getId());
+                    }
                     return new CategoryResponse(category, count);
                 })
                 .collect(Collectors.toList());

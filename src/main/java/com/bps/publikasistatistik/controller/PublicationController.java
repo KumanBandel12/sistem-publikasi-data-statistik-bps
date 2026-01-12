@@ -1,6 +1,7 @@
 package com.bps.publikasistatistik.controller;
 
 import com.bps.publikasistatistik.dto.ApiResponse;
+import com.bps.publikasistatistik.dto.PagedResponse;
 import com.bps.publikasistatistik.dto.PublicationRequest;
 import com.bps.publikasistatistik.dto.PublicationResponse;
 import com.bps.publikasistatistik.security.CustomUserDetails;
@@ -56,14 +57,17 @@ public class PublicationController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String sort,
+            @RequestParam(required = false, defaultValue = "false") Boolean includeChildren,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         try {
             // Save search keyword to history if search parameter is provided
             if (search != null && !search.trim().isEmpty()) {
                 searchHistoryService.saveSearchKeyword(userDetails, search.trim());
             }
-            
-            List<PublicationResponse> publications = publicationService.searchPublications(search, categoryId, year, sort);
+
+            List<PublicationResponse> publications = publicationService.searchPublications(
+                    search, categoryId, year, sort, includeChildren
+            );
             return ResponseEntity.ok(new ApiResponse<>(true, "Publications retrieved successfully", publications));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
@@ -203,6 +207,33 @@ public class PublicationController {
         try {
             List<String> suggestions = publicationService.getSearchSuggestions(keyword);
             return ResponseEntity.ok(new ApiResponse<>(true, "Suggestions retrieved", suggestions));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, e.getMessage(), null));
+        }
+    }
+
+    @GetMapping("/paged")
+    @Operation(summary = "Get publications with pagination", description = "Get paginated list of publications")
+    public ResponseEntity<ApiResponse<PagedResponse<PublicationResponse>>> getPublicationsPaged(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false, defaultValue = "latest") String sort,
+            @RequestParam(required = false, defaultValue = "false") Boolean includeChildren,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            // Save search keyword to history
+            if (search != null && !search.trim().isEmpty()) {
+                searchHistoryService.saveSearchKeyword(userDetails, search.trim());
+            }
+
+            PagedResponse<PublicationResponse> publications = publicationService.searchPublicationsPaged(
+                    search, categoryId, year, sort, includeChildren, page, size
+            );
+            return ResponseEntity.ok(new ApiResponse<>(true, "Publications retrieved successfully", publications));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(new ApiResponse<>(false, e.getMessage(), null));

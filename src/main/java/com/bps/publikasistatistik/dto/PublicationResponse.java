@@ -35,6 +35,7 @@ public class PublicationResponse {
     private UserResponse uploadedBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean isFlagship;
 
     // Constructor dari Entity
     public PublicationResponse(Publication publication) {
@@ -61,6 +62,7 @@ public class PublicationResponse {
         this.uploadedBy = new UserResponse(publication.getUploadedBy());
         this.createdAt = publication.getCreatedAt();
         this.updatedAt = publication.getUpdatedAt();
+        this.isFlagship = publication.getIsFlagship();
     }
 
     // Helper method untuk format file size

@@ -1,6 +1,7 @@
 package com.bps.publikasistatistik.repository;
 
 import com.bps.publikasistatistik.entity.Publication;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -57,4 +58,36 @@ public interface PublicationRepository extends JpaRepository<Publication, Long> 
 
     // Hitung jumlah flagship aktif
     long countByIsFlagshipTrue();
+
+    // Find publications by multiple category IDs
+    @Query("SELECT p FROM Publication p WHERE p.category.id IN :categoryIds")
+    List<Publication> findByCategoryIdIn(@Param("categoryIds") List<Long> categoryIds);
+
+    // Find publications by multiple category IDs and year
+    @Query("SELECT p FROM Publication p WHERE p.category.id IN :categoryIds AND p.year = :year")
+    List<Publication> findByCategoryIdInAndYear(@Param("categoryIds") List<Long> categoryIds, @Param("year") Integer year);
+
+    // Count publications by multiple category IDs
+    @Query("SELECT COUNT(p) FROM Publication p WHERE p.category.id IN :categoryIds")
+    Long countByCategoryIdIn(@Param("categoryIds") List<Long> categoryIds);
+
+    // Paginated search by keyword
+    @Query("SELECT p FROM Publication p WHERE " +
+            "LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<Publication> searchByKeywordPaged(@Param("keyword") String keyword, Pageable pageable);
+
+    // Paginated find by category IDs
+    @Query("SELECT p FROM Publication p WHERE p.category.id IN :categoryIds")
+    Page<Publication> findByCategoryIdInPaged(@Param("categoryIds") List<Long> categoryIds, Pageable pageable);
+
+    // Paginated find by category IDs and year
+    @Query("SELECT p FROM Publication p WHERE p.category.id IN :categoryIds AND p.year = :year")
+    Page<Publication> findByCategoryIdInAndYearPaged(@Param("categoryIds") List<Long> categoryIds, @Param("year") Integer year, Pageable pageable);
+
+    // Paginated find by year
+    Page<Publication> findByYear(Integer year, Pageable pageable);
+
+    // Paginated find all
+    Page<Publication> findAll(Pageable pageable);
 }

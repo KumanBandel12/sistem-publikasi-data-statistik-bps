@@ -9,6 +9,8 @@ import com.bps.publikasistatistik.repository.CategoryRepository;
 import com.bps.publikasistatistik.repository.PublicationRepository;
 import com.bps.publikasistatistik.repository.UserRepository;
 import com.bps.publikasistatistik.security.CustomUserDetails;
+import org.springframework.data.domain.*;
+import com.bps.publikasistatistik.dto.PagedResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -20,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -40,34 +43,52 @@ public class PublicationService {
                 .collect(Collectors.toList());
     }
 
-    public List<PublicationResponse> searchPublications(String keyword, Long categoryId, Integer year, String sort) {
+    public List<PublicationResponse> searchPublications(String keyword, Long categoryId, Integer year, String sort, Boolean includeChildren) {
         List<Publication> publications;
 
+        // Get category IDs to filter (make it final for lambda usage)
+        final List<Long> categoryIds;
+        if (categoryId != null) {
+            List<Long> tempIds = new ArrayList<>();
+            tempIds.add(categoryId);
+
+            // Include sub-categories if requested
+            if (Boolean.TRUE.equals(includeChildren)) {
+                List<Category> subCategories = categoryRepository.findByParentCategoryId(categoryId);
+                for (Category sub : subCategories) {
+                    tempIds.add(sub.getId());
+                }
+            }
+            categoryIds = tempIds;  // Assign to final variable
+        } else {
+            categoryIds = null;
+        }
+
         // Build query based on filters
-        if (keyword != null && !keyword.trim().isEmpty() && categoryId != null && year != null) {
+        if (keyword != null && !keyword.trim().isEmpty() && categoryIds != null && year != null) {
             // Search + Category + Year
             publications = publicationRepository.searchByKeyword(keyword).stream()
-                    .filter(p -> p.getCategory().getId().equals(categoryId) && p.getYear().equals(year))
+                    .filter(p -> categoryIds.contains(p.getCategory().getId()) && p.getYear().equals(year))
                     .collect(Collectors.toList());
-        } else if (keyword != null && !keyword.trim().isEmpty() && categoryId != null) {
+        } else if (keyword != null && !keyword.trim().isEmpty() && categoryIds != null) {
             // Search + Category
             publications = publicationRepository.searchByKeyword(keyword).stream()
-                    .filter(p -> p.getCategory().getId().equals(categoryId))
+                    .filter(p -> categoryIds.contains(p.getCategory().getId()))
                     .collect(Collectors.toList());
         } else if (keyword != null && !keyword.trim().isEmpty() && year != null) {
             // Search + Year
             publications = publicationRepository.searchByKeyword(keyword).stream()
                     .filter(p -> p.getYear().equals(year))
                     .collect(Collectors.toList());
-        } else if (categoryId != null && year != null) {
+        } else if (categoryIds != null && year != null) {
             // Category + Year
-            publications = publicationRepository.findByCategoryIdAndYear(categoryId, year);
+            publications = publicationRepository.findByCategoryIdInAndYear(categoryIds, year);
         } else if (keyword != null && !keyword.trim().isEmpty()) {
             // Search only
             publications = publicationRepository.searchByKeyword(keyword);
-        } else if (categoryId != null) {
-            // Category only
-            publications = publicationRepository.findByCategoryId(categoryId);
+        } else if (categoryIds != null) {
+            // Category only (with children if requested)
+            publications = publicationRepository.findByCategoryIdIn(categoryIds);
         } else if (year != null) {
             // Year only
             publications = publicationRepository.findByYear(year);
@@ -380,5 +401,110 @@ public class PublicationService {
         }
         // Ambil maksimal 10 saran judul
         return publicationRepository.findTitleSuggestions(keyword.trim(), PageRequest.of(0, 10));
+    }
+
+    public PagedResponse<PublicationResponse> searchPublicationsPaged(
+            String keyword, Long categoryId, Integer year, String sort,
+            Boolean includeChildren, int page, int size) {
+
+        // Determine sorting
+        Sort sorting = Sort.by(Sort.Direction.DESC, "createdAt"); // default: latest
+        if ("oldest".equalsIgnoreCase(sort)) {
+            sorting = Sort.by(Sort.Direction.ASC, "createdAt");
+        }
+
+        Pageable pageable = PageRequest.of(page, size, sorting);
+        Page<Publication> publicationPage;
+
+        // Get category IDs to filter
+        final List<Long> categoryIds;
+        if (categoryId != null) {
+            List<Long> tempIds = new ArrayList<>();
+            tempIds.add(categoryId);
+
+            if (Boolean.TRUE.equals(includeChildren)) {
+                List<Category> subCategories = categoryRepository.findByParentCategoryId(categoryId);
+                for (Category sub : subCategories) {
+                    tempIds.add(sub.getId());
+                }
+            }
+            categoryIds = tempIds;
+        } else {
+            categoryIds = null;
+        }
+
+        // Build query based on filters
+        if (keyword != null && !keyword.trim().isEmpty() && categoryIds != null && year != null) {
+            // For complex filters, use in-memory filtering (not ideal but works)
+            List<Publication> filtered = publicationRepository.searchByKeyword(keyword).stream()
+                    .filter(p -> categoryIds.contains(p.getCategory().getId()) && p.getYear().equals(year))
+                    .collect(Collectors.toList());
+            return createPagedResponse(filtered, page, size, sort);
+        } else if (keyword != null && !keyword.trim().isEmpty() && categoryIds != null) {
+            List<Publication> filtered = publicationRepository.searchByKeyword(keyword).stream()
+                    .filter(p -> categoryIds.contains(p.getCategory().getId()))
+                    .collect(Collectors.toList());
+            return createPagedResponse(filtered, page, size, sort);
+        } else if (keyword != null && !keyword.trim().isEmpty() && year != null) {
+            List<Publication> filtered = publicationRepository.searchByKeyword(keyword).stream()
+                    .filter(p -> p.getYear().equals(year))
+                    .collect(Collectors.toList());
+            return createPagedResponse(filtered, page, size, sort);
+        } else if (categoryIds != null && year != null) {
+            publicationPage = publicationRepository.findByCategoryIdInAndYearPaged(categoryIds, year, pageable);
+        } else if (keyword != null && !keyword.trim().isEmpty()) {
+            publicationPage = publicationRepository.searchByKeywordPaged(keyword, pageable);
+        } else if (categoryIds != null) {
+            publicationPage = publicationRepository.findByCategoryIdInPaged(categoryIds, pageable);
+        } else if (year != null) {
+            publicationPage = publicationRepository.findByYear(year, pageable);
+        } else {
+            publicationPage = publicationRepository.findAll(pageable);
+        }
+
+        List<PublicationResponse> content = publicationPage.getContent().stream()
+                .map(PublicationResponse::new)
+                .collect(Collectors.toList());
+
+        return new PagedResponse<>(
+                content,
+                publicationPage.getNumber(),
+                publicationPage.getTotalPages(),
+                publicationPage.getTotalElements(),
+                publicationPage.getSize(),
+                publicationPage.hasNext(),
+                publicationPage.hasPrevious()
+        );
+    }
+
+    // Helper method untuk in-memory pagination
+    private PagedResponse<PublicationResponse> createPagedResponse(
+            List<Publication> allData, int page, int size, String sort) {
+
+        // Sort
+        if ("oldest".equalsIgnoreCase(sort)) {
+            allData.sort((p1, p2) -> p1.getCreatedAt().compareTo(p2.getCreatedAt()));
+        } else {
+            allData.sort((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()));
+        }
+
+        int totalElements = allData.size();
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+        int start = page * size;
+        int end = Math.min(start + size, totalElements);
+
+        List<PublicationResponse> content = (start < totalElements)
+                ? allData.subList(start, end).stream().map(PublicationResponse::new).collect(Collectors.toList())
+                : List.of();
+
+        return new PagedResponse<>(
+                content,
+                page,
+                totalPages,
+                totalElements,
+                size,
+                page < totalPages - 1,
+                page > 0
+        );
     }
 }
